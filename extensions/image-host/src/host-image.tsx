@@ -1,68 +1,82 @@
-import { Action, ActionPanel, Form, Clipboard, popToRoot, getPreferenceValues, showToast, Toast } from "@raycast/api";
-import { showFailureToast, useForm } from "@raycast/utils";
+import { Action, ActionPanel, Form, Clipboard, showHUD, getPreferenceValues } from "@raycast/api";
 import imgbbUploader from "imgbb-uploader";
+import fileURLToPath from "file-uri-to-path";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-const supportedExtensions = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "heic"];
+const supportedExtensions = ["png", "jpg", "jpeg", "gif", "bmp", "tiff", "webp", "heic", "pdf"];
 
-interface FormValues {
-  files: string[];
-}
+type Preferences = {
+  apiKey: string;
+};
 
 const preferences: Preferences = getPreferenceValues();
 
 export default function Command() {
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [file, setFile] = useState<string[]>([]);
+  const [error, setError] = useState<string | undefined>(undefined);
 
-  const { handleSubmit, itemProps } = useForm<FormValues>({
-    onSubmit(values) {
-      setIsLoading(true);
+  useEffect(() => {
+    async function checkIfFileCopied() {
+      const { file } = await Clipboard.read();
 
-      imgbbUploader(preferences.apiKey, values.files[0])
-        .then(async (response: { url: string }) => {
-          await Clipboard.copy(response.url);
+      console.log(file);
+      if (file && supportedExtensions.includes(file.split(".").pop() || "")) {
+        const path = fileURLToPath(file);
+        setFile([path]);
+      }
+    }
 
-          showToast({
-            style: Toast.Style.Success,
-            title: "Success!",
-            message: "Image URL copied to clipboard!",
-          });
-
-          setIsLoading(false);
-          popToRoot({ clearSearchBar: true });
-        })
-        .catch((error: string) => {
-          showFailureToast(error, { title: "Failed to host image!" });
-          setIsLoading(false);
-        });
-    },
-    validation: {
-      files: (value) => {
-        if (value && value.length > 0) {
-          const ext = value[0].split(".").pop();
-          if (!ext || !supportedExtensions.includes(ext)) {
-            return "Unsupported file type";
-          }
-        } else {
-          return "Please select a file";
-        }
-      },
-    },
-  });
+    checkIfFileCopied();
+  }, []);
 
   return (
     <Form
-      isLoading={isLoading}
       actions={
         <ActionPanel>
-          <Action.SubmitForm title="Host Image" onSubmit={handleSubmit} />
+          <Action.SubmitForm
+            title="Host Image"
+            onSubmit={async (values) => {
+              if (file.length === 0) {
+                setError("No file selected");
+                return;
+              }
+
+              imgbbUploader(preferences.apiKey, values.files[0])
+                .then(async (response: { url: string }) => {
+                  await Clipboard.copy(response.url);
+                  await showHUD("Image hosted and URL copied to clipboard");
+                })
+                .catch((error: string) => console.error(error));
+            }}
+          />
         </ActionPanel>
       }
     >
-      <Form.FilePicker allowMultipleSelection={false} title="Image" {...itemProps.files} />
+      <Form.FilePicker
+        id="files"
+        value={file}
+        onChange={(newFile) => {
+          if (newFile.length === 0) {
+            setFile([]);
+            return;
+          }
 
-      <Form.Description text="Choose an image to host (png, jpg, jpeg, gif, bmp, tiff, webp, heic)" />
+          const ext = newFile[0].split(".").pop();
+          if (!ext || !supportedExtensions.includes(ext)) {
+            setError("Unsupported file type");
+            return;
+          }
+
+          console.log(newFile);
+          setError(undefined);
+          setFile(newFile);
+        }}
+        allowMultipleSelection={false}
+        error={error}
+      />
+
+      <Form.Description text="Choose an image to host (png, jpg, jpeg, gif, bmp, tiff, webp, heic, pdf)" />
     </Form>
   );
 }

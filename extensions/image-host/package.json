@@ -29,9 +29,11 @@
   ],
   "dependencies": {
     "@raycast/api": "^1.65.1",
-    "@raycast/utils": "^1.11.1",
+    "file-uri-to-path": "^2.0.0",
+    "i": "^0.3.7",
     "imgbb-uploader": "^1.5.1",
-    "imgur-uploader": "^4.2.1"
+    "imgur-uploader": "^4.2.1",
+    "npm": "^10.5.2"
   },
   "devDependencies": {
     "@raycast/eslint-config": "^1.0.6",
